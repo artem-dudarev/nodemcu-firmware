@@ -119,7 +119,27 @@ static int bit_clear( lua_State* L )
   return 1; 
 }
 
+// Lua: res = mirror( value )
+static int bit_mirror( lua_State* L )
+{
+  lua_UInteger value = ( lua_UInteger )luaL_checkinteger( L, 1 );
+  unsigned result = 0;
+
+  if (value & 0x01) result |= 0x80;
+  if (value & 0x02) result |= 0x40;
+  if (value & 0x04) result |= 0x20;
+  if (value & 0x08) result |= 0x10;
+  if (value & 0x10) result |= 0x08;
+  if (value & 0x20) result |= 0x04;
+  if (value & 0x40) result |= 0x02;
+  if (value & 0x80) result |= 0x01;
+
+  lua_pushinteger( L, ( lua_Integer )result);
+  return 1; 
+}
+
 static const LUA_REG_TYPE bit_map[] = {
+  { LSTRKEY( "mirror" ),  LFUNCVAL( bit_mirror) },
   { LSTRKEY( "bnot" ),    LFUNCVAL( bit_bnot ) },
   { LSTRKEY( "band" ),    LFUNCVAL( bit_band ) },
   { LSTRKEY( "bor" ),     LFUNCVAL( bit_bor ) },
