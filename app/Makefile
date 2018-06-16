@@ -46,10 +46,9 @@ SUBDIRS= 					\
 	fatfs					\
 	esp-gdbstub				\
 	websocket				\
-	swTimer					\
-	misc					\
 	pm					\
 	sjson					\
+ 	sqlite3					\
 	
 
 endif # } PDIR
@@ -101,9 +100,8 @@ COMPONENTS_eagle.app.v6 = 			\
 	net/libnodemcu_net.a			\
 	mbedtls/libmbedtls.a      		\
 	modules/libmodules.a			\
-	swTimer/libswtimer.a			\
-	misc/libmisc.a				\
 	sjson/libsjson.a			\
+  sqlite3/libsqlite3.a			\
 	
 
 # Inspect the modules library and work out which modules need to be linked.
@@ -164,6 +162,7 @@ CONFIGURATION_DEFINES =	-D__ets__ 		\
 			-DLWIP_OPEN_SRC 	\
 			-DPBUF_RSV_FOR_WLAN 	\
 			-DEBUF_LWIP		\
+			-DUSE_OPTIMIZE_PRINTF \
 			-DMBEDTLS_USER_CONFIG_FILE=\"user_mbedtls.h\"  \
 
 DEFINES += 					\
