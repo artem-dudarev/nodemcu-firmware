@@ -4,12 +4,12 @@
 #include "lauxlib.h"
 #include "lmem.h"
 #include "user_interface.h"
-#include "c_types.h"
-#include "c_string.h"
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
 #include "ets_sys.h"
 #include "time.h"
 #include "rtc/rtctime.h"
-#include "stdlib.h"
 #include "mem.h"
 
 struct cronent_desc {
@@ -32,18 +32,23 @@ static size_t cronent_count = 0;
 
 static uint64_t lcron_parsepart(lua_State *L, char *str, char **end, uint8_t min, uint8_t max) {
   uint64_t res = 0;
+
+  /* Gobble whitespace before potential stars; no strtol on that path */
+  while (*str != '\0' && (*str == ' ' || *str == '\t')) {
+    str++;
+  }
+
   if (str[0] == '*') {
     uint32_t each = 1;
     *end = str + 1;
     if (str[1] == '/') {
       each = strtol(str + 2, end, 10);
-      if (end != 0)
       if (each == 0 || each >= max - min) {
         return luaL_error(L, "invalid spec (each %d)", each);
       }
     }
     for (int i = 0; i <= (max - min); i++) {
-      if (((min + i) % each) == 0) res |= (uint64_t)1 << i;
+      if ((i % each) == 0) res |= (uint64_t)1 << i;
     }
   } else {
     uint32_t val;
@@ -63,14 +68,17 @@ static uint64_t lcron_parsepart(lua_State *L, char *str, char **end, uint8_t min
 static int lcron_parsedesc(lua_State *L, char *str, struct cronent_desc *desc) {
   char *s = str;
   desc->min = lcron_parsepart(L, s, &s, 0, 59);
-  if (*s != ' ') return luaL_error(L, "invalid spec (separator @%d)", s - str);
+  if (*s != ' ' && *s != '\t') return luaL_error(L, "invalid spec (separator @%d)", s - str);
   desc->hour = lcron_parsepart(L, s + 1, &s, 0, 23);
-  if (*s != ' ') return luaL_error(L, "invalid spec (separator @%d)", s - str);
+  if (*s != ' ' && *s != '\t') return luaL_error(L, "invalid spec (separator @%d)", s - str);
   desc->dom = lcron_parsepart(L, s + 1, &s, 1, 31);
-  if (*s != ' ') return luaL_error(L, "invalid spec (separator @%d)", s - str);
+  if (*s != ' ' && *s != '\t') return luaL_error(L, "invalid spec (separator @%d)", s - str);
   desc->mon = lcron_parsepart(L, s + 1, &s, 1, 12);
-  if (*s != ' ') return luaL_error(L, "invalid spec (separator @%d)", s - str);
+  if (*s != ' ' && *s != '\t') return luaL_error(L, "invalid spec (separator @%d)", s - str);
   desc->dow = lcron_parsepart(L, s + 1, &s, 0, 6);
+  while (*s != '\0' && (*s == ' ' || *s == '\t')) {
+    s++;
+  }
   if (*s != 0) return luaL_error(L, "invalid spec (trailing @%d)", s - str);
   return 0;
 }
@@ -78,6 +86,7 @@ static int lcron_parsedesc(lua_State *L, char *str, struct cronent_desc *desc) {
 static int lcron_create(lua_State *L) {
   // Check arguments
   char *strdesc = (char*)luaL_checkstring(L, 1);
+  void *newlist;
   luaL_checkanyfunction(L, 2);
   // Parse description
   struct cronent_desc desc;
@@ -93,8 +102,12 @@ static int lcron_create(lua_State *L) {
   // Set entry
   ud->desc = desc;
   // Store entry
+  newlist = os_realloc(cronent_list, sizeof(int) * (cronent_count + 1));
+  if (newlist == NULL) {
+    return luaL_error(L, "out of memory");
+  }
   lua_pushvalue(L, -1);
-  cronent_list = os_realloc(cronent_list, sizeof(int) * (cronent_count + 1));
+  cronent_list = newlist;
   cronent_list[cronent_count++] = luaL_ref(L, LUA_REGISTRYINDEX);
   return 1;
 }
@@ -120,8 +133,13 @@ static int lcron_schedule(lua_State *L) {
   ud->desc = desc;
   size_t i = lcron_findindex(L, ud);
   if (i == -1) {
+    void *newlist;
+    newlist = os_realloc(cronent_list, sizeof(int) * (cronent_count + 1));
+    if (newlist == NULL) {
+      return luaL_error(L, "out of memory");
+    }
+    cronent_list = newlist;
     lua_pushvalue(L, 1);
-    cronent_list = os_realloc(cronent_list, sizeof(int) * (cronent_count + 1));
     cronent_list[cronent_count++] = lua_ref(L, LUA_REGISTRYINDEX);
   }
   return 0;
@@ -158,7 +176,7 @@ static int lcron_reset(lua_State *L) {
     luaL_unref(L, LUA_REGISTRYINDEX, cronent_list[i]);
   }
   cronent_count = 0;
-  os_free(cronent_list);
+  free(cronent_list);
   cronent_list = 0;
   return 0;
 }
@@ -206,20 +224,20 @@ static void cron_handle_tmr() {
   cron_handle_time(tm.tm_mon + 1, tm.tm_mday, tm.tm_wday, tm.tm_hour, tm.tm_min);
 }
 
-static const LUA_REG_TYPE cronent_map[] = {
-  { LSTRKEY( "schedule" ),   LFUNCVAL( lcron_schedule ) },
-  { LSTRKEY( "handler" ),    LFUNCVAL( lcron_handler ) },
-  { LSTRKEY( "unschedule" ), LFUNCVAL( lcron_unschedule ) },
-  { LSTRKEY( "__gc" ),       LFUNCVAL( lcron_delete ) },
-  { LSTRKEY( "__index" ),    LROVAL( cronent_map ) },
-  { LNILKEY, LNILVAL }
-};
+LROT_BEGIN(cronent)
+  LROT_FUNCENTRY( schedule, lcron_schedule )
+  LROT_FUNCENTRY( handler, lcron_handler )
+  LROT_FUNCENTRY( unschedule, lcron_unschedule )
+  LROT_FUNCENTRY( __gc, lcron_delete )
+  LROT_TABENTRY( __index, cronent )
+LROT_END( cronent, cronent, LROT_MASK_GC_INDEX )
 
-static const LUA_REG_TYPE cron_map[] = {
-  { LSTRKEY( "schedule" ),   LFUNCVAL( lcron_create ) },
-  { LSTRKEY( "reset" ),      LFUNCVAL( lcron_reset ) },
-  { LNILKEY, LNILVAL }
-};
+
+LROT_BEGIN(cron)
+  LROT_FUNCENTRY( schedule, lcron_create )
+  LROT_FUNCENTRY( reset, lcron_reset )
+LROT_END( cron, NULL, 0 )
+
 #include "pm/swtimer.h"
 
 int luaopen_cron( lua_State *L ) {
@@ -229,8 +247,8 @@ int luaopen_cron( lua_State *L ) {
     //cron_handle_tmr determines when to execute a scheduled cron job
     //My guess: To be sure to give the other modules required by cron enough time to get to a ready state, restart cron_timer.
   os_timer_arm(&cron_timer, 1000, 0);
-  luaL_rometatable(L, "cron.entry", (void *)cronent_map);
+  luaL_rometatable(L, "cron.entry", LROT_TABLEREF(cronent));
   return 0;
 }
 
-NODEMCU_MODULE(CRON, "cron", cron_map, luaopen_cron);
+NODEMCU_MODULE(CRON, "cron", cron, luaopen_cron);

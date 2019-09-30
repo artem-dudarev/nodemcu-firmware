@@ -1,7 +1,7 @@
 //
 // This module allows performance monitoring by looking at
 // the PC at regular intervals and building a histogram
-// 
+//
 // perf.start(start, end, nbins[, pc offset on stack])
 // perf.stop()  -> total sample, samples outside range, table { addr -> count , .. }
 
@@ -9,7 +9,7 @@
 #include "ets_sys.h"
 #include "os_type.h"
 #include "osapi.h"
-#include "c_stdlib.h"
+#include <stdlib.h>
 
 #include "module.h"
 #include "lauxlib.h"
@@ -135,10 +135,10 @@ static int perf_stop(lua_State *L)
   return 4;
 }
 
-static const LUA_REG_TYPE perf_map[] = {
-  { LSTRKEY( "start" ),   LFUNCVAL( perf_start ) },
-  { LSTRKEY( "stop" ),    LFUNCVAL( perf_stop ) },
-  { LNILKEY, LNILVAL }
-};
+LROT_BEGIN(perf)
+  LROT_FUNCENTRY( start, perf_start )
+  LROT_FUNCENTRY( stop, perf_stop )
+LROT_END( perf, NULL, 0 )
 
-NODEMCU_MODULE(PERF, "perf", perf_map, NULL);
+
+NODEMCU_MODULE(PERF, "perf", perf, NULL);

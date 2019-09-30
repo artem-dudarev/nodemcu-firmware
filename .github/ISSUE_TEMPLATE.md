@@ -1,5 +1,5 @@
 Make sure you read and understand http://nodemcu.readthedocs.io/en/dev/en/support/.
-Use one of the two templates below and delete the rest.
+Use one of the two templates below and **DELETE THE REST**.
 
 8<------------------------ BUG REPORT -----------------------------------------
 ### Expected behavior
@@ -15,7 +15,7 @@ Provide a [Minimal, Complete, and Verifiable example](http://stackoverflow.com/h
 Which branch are you on? If you know the Git revision then add it here as well.
 
 ### Hardware
-Describe which ESP8266 device you use and document any special hardware setup 
+Describe which ESP8266 device you use and document any special hardware setup
 required to reproduce the problem.
 
 8<------------------------ END BUG REPORT -------------------------------------

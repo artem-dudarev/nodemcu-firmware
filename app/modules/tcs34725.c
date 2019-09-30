@@ -1,8 +1,8 @@
 // ***************************************************************************
 // TCS34725 module for ESP8266 with nodeMCU
-// 
+//
 // Written by K. Townsend (microBuilder.eu), Adapted for nodeMCU by Travis Howse (tjhowse gmail.com)
-// 
+//
 // BSD (see license.txt)
 // ***************************************************************************
 
@@ -22,7 +22,7 @@
 #include "module.h"
 #include "lauxlib.h"
 #include "platform.h"
-#include "c_math.h"
+#include <math.h>
 
 // #define TCS34725_ADDRESS					(0x29<<1)
 #define TCS34725_ADDRESS					(0x29)
@@ -139,17 +139,17 @@ uint8_t tcs34725Write8 (uint8_t reg, uint8_t value)
 uint8_t tcs34725Read8(uint8_t reg)
 {
 	uint8_t value;
-	
+
 	platform_i2c_send_start(TCS34725_BUS_ID);
 	platform_i2c_send_address(TCS34725_BUS_ID, TCS34725_ADDRESS, PLATFORM_I2C_DIRECTION_TRANSMITTER);
 	platform_i2c_send_byte(TCS34725_BUS_ID, TCS34725_COMMAND_BIT | reg);
 	platform_i2c_send_stop(TCS34725_BUS_ID);
-	
+
 	platform_i2c_send_start(TCS34725_BUS_ID);
 	platform_i2c_send_address(TCS34725_BUS_ID, TCS34725_ADDRESS, PLATFORM_I2C_DIRECTION_RECEIVER);
 	value = platform_i2c_recv_byte(TCS34725_BUS_ID, 0);
 	platform_i2c_send_stop(TCS34725_BUS_ID);
-	
+
 	return value;
 }
 
@@ -159,10 +159,10 @@ uint8_t tcs34725Read8(uint8_t reg)
 */
 /**************************************************************************/
 uint16_t tcs34725Read16(uint8_t reg)
-{		
+{
 	uint8_t low = tcs34725Read8(reg);
 	uint8_t high = tcs34725Read8(++reg);
-	
+
 	return (high << 8) | low;
 }
 /**************************************************************************/
@@ -179,16 +179,16 @@ uint8_t tcs34725EnableDone()
 
 	/* Ready to go ... set the initialised flag */
 	_tcs34725Initialised = true;
-	
+
 	/* This needs to take place after the initialisation flag! */
 	tcs34725SetIntegrationTime(TCS34725_INTEGRATIONTIME_2_4MS, L);
-	tcs34725SetGain(TCS34725_GAIN_60X, L);	
-	
+	tcs34725SetGain(TCS34725_GAIN_60X, L);
+
 	lua_rawgeti(L, LUA_REGISTRYINDEX, cb_tcs_en); // Get the callback to call
 	luaL_unref(L, LUA_REGISTRYINDEX, cb_tcs_en); // Unregister the callback to avoid leak
 	cb_tcs_en = LUA_NOREF;
 	lua_call(L, 0, 0);
-	
+
 	return 0;
 }
 
@@ -210,7 +210,7 @@ uint8_t tcs34725Enable(lua_State* L)
 	} else {
 		return luaL_error(L, "Enable argument must be a function.");
 	}
-	
+
 	tcs34725Write8(TCS34725_ENABLE, TCS34725_ENABLE_PON);
 	// Start a timer to wait TCS34725_EN_DELAY before calling tcs34725EnableDone
 	os_timer_disarm (&tcs34725_timer);
@@ -250,7 +250,7 @@ uint8_t tcs34725Setup(lua_State* L)
 	if (id != 0x44) {
 		return luaL_error(L, "No TCS34725 found.");
 	}
-	
+
 	lua_pushinteger(L, 1);
 	return 1;
 }
@@ -324,7 +324,7 @@ uint8_t tcs34725GetRawData(lua_State* L)
 	uint16_t g;
 	uint16_t b;
 	uint16_t c;
-	
+
 	if (!_tcs34725Initialised)
 	{
 		return luaL_error(L, "TCS34725 not initialised.");
@@ -342,14 +342,14 @@ uint8_t tcs34725GetRawData(lua_State* L)
 }
 
 
-static const LUA_REG_TYPE tcs34725_map[] = {
-	{ LSTRKEY( "setup" ), LFUNCVAL(tcs34725Setup)},
-	{ LSTRKEY( "enable" ),  LFUNCVAL(tcs34725Enable)},
-	{ LSTRKEY( "disable" ),  LFUNCVAL(tcs34725Disable)},
-	{ LSTRKEY( "raw" ),  LFUNCVAL(tcs34725GetRawData)},
-	{ LSTRKEY( "setGain" ),  LFUNCVAL(tcs34725LuaSetGain)},
-	{ LSTRKEY( "setIntegrationTime" ),  LFUNCVAL(tcs34725LuaSetIntegrationTime)},
-	{ LNILKEY, LNILVAL}
-};
+LROT_BEGIN(tcs34725)
+  LROT_FUNCENTRY( setup, tcs34725Setup )
+  LROT_FUNCENTRY( enable, tcs34725Enable )
+  LROT_FUNCENTRY( disable, tcs34725Disable )
+  LROT_FUNCENTRY( raw, tcs34725GetRawData )
+  LROT_FUNCENTRY( setGain, tcs34725LuaSetGain )
+  LROT_FUNCENTRY( setIntegrationTime, tcs34725LuaSetIntegrationTime )
+LROT_END( tcs34725, NULL, 0 )
 
-NODEMCU_MODULE(TCS34725, "tcs34725", tcs34725_map, NULL);
+
+NODEMCU_MODULE(TCS34725, "tcs34725", tcs34725, NULL);

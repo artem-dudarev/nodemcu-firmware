@@ -25,15 +25,6 @@
 #include MBEDTLS_CONFIG_FILE
 #endif
 
-// XXX Espressif are hacks sometimes.  This is BS, but is taken from
-// the mbedtls platform.c from their SDK.  Really, this should go
-// somewhere else.  Note that the prototype here for vPortFree differs (!)
-// from the one in sdk-overrides.h.  That's above my pay grade.
-// --nwf;  2018 Feb 18
-extern void *pvPortCalloc(unsigned int count, unsigned int size);
-extern void vPortFree( void *pv );
-
-
 #if defined(MBEDTLS_PLATFORM_C)
 
 #include "mbedtls/platform.h"
@@ -46,7 +37,14 @@ static void mbedtls_zeroize( void *v, size_t n ) {
 }
 #endif
 
-#if defined(MBEDTLS_PLATFORM_MEMORY)
+/* The compile time configuration of memory allocation via the macros
+ * MBEDTLS_PLATFORM_{FREE/CALLOC}_MACRO takes precedence over the runtime
+ * configuration via mbedtls_platform_set_calloc_free(). So, omit everything
+ * related to the latter if MBEDTLS_PLATFORM_{FREE/CALLOC}_MACRO are defined. */
+#if defined(MBEDTLS_PLATFORM_MEMORY) &&                 \
+    !( defined(MBEDTLS_PLATFORM_CALLOC_MACRO) &&        \
+       defined(MBEDTLS_PLATFORM_FREE_MACRO) )
+
 #if !defined(MBEDTLS_PLATFORM_STD_CALLOC)
 static void *platform_calloc_uninit( size_t n, size_t size )
 {
@@ -77,7 +75,9 @@ int mbedtls_platform_set_calloc_free( void * (*calloc_func)( size_t, size_t ),
     mbedtls_free = free_func;
     return( 0 );
 }
-#endif /* MBEDTLS_PLATFORM_MEMORY */
+#endif /* MBEDTLS_PLATFORM_MEMORY &&
+          !( defined(MBEDTLS_PLATFORM_CALLOC_MACRO) &&
+             defined(MBEDTLS_PLATFORM_FREE_MACRO) ) */
 
 #if defined(_WIN32)
 #include <stdarg.h>
@@ -91,7 +91,7 @@ int mbedtls_platform_win32_snprintf( char *s, size_t n, const char *fmt, ... )
         return( -1 );
 
     va_start( argp, fmt );
-#if defined(_TRUNCATE)
+#if defined(_TRUNCATE) && !defined(__MINGW32__)
     ret = _vsnprintf_s( s, n, _TRUNCATE, fmt, argp );
 #else
     ret = _vsnprintf( s, n, fmt, argp );

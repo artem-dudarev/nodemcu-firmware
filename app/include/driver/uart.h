@@ -3,7 +3,7 @@
 
 #include "uart_register.h"
 #include "eagle_soc.h"
-#include "c_types.h"
+#include <stdint.h>
 #include "os_type.h"
 
 #define RX_BUFF_SIZE    0x100
@@ -106,7 +106,7 @@ typedef struct {
     UartBautRate      baut_rate;
     UartBitsNum4Char  data_bits;
     UartExistParity   exist_parity;
-    UartParityMode    parity;   
+    UartParityMode    parity;
     UartStopBitsNum   stop_bits;
 } UartConfig;
 
